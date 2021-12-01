@@ -1,5 +1,7 @@
 module github.com/bopher/crypto
 
-go 1.16
+go 1.17
 
-require golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97
+require golang.org/x/crypto v0.0.0-20211117183948-ae814b36b871
+
+require golang.org/x/sys v0.0.0-20211124211545-fe61309f8881 // indirect
