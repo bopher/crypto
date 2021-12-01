@@ -11,13 +11,13 @@ import (
 	"crypto/sha512"
 	"encoding/base64"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"hash"
 	"io"
 	"path/filepath"
 	"time"
 
+	"github.com/bopher/utils"
 	"golang.org/x/crypto/md4"
 	"golang.org/x/crypto/sha3"
 )
@@ -27,10 +27,14 @@ type cryptoDriver struct {
 	key string
 }
 
+func (cryptoDriver) err(format string, args ...interface{}) error {
+	return utils.TaggedError([]string{"Crypto"}, format, args...)
+}
+
 // Hash make hash for data
-func (c *cryptoDriver) Hash(data string, algo HashAlgo) (string, error) {
+func (this cryptoDriver) Hash(data string, algo HashAlgo) (string, error) {
 	var hasher hash.Hash
-	key := []byte(c.key)
+	key := []byte(this.key)
 
 	switch algo {
 	case MD4:
@@ -66,30 +70,30 @@ func (c *cryptoDriver) Hash(data string, algo HashAlgo) (string, error) {
 	}
 
 	if hasher == nil {
-		return "", errors.New("[Crypto HASH] invalid hasher")
+		return "", this.err("invalid hasher %s.", algo)
 	}
 
 	_, err := hasher.Write([]byte(data))
 	if err != nil {
-		return "", err
+		return "", this.err(err.Error())
 	}
 
 	return hex.EncodeToString(hasher.Sum(nil)), nil
 }
 
 // HashFilename make hashed filename based on current timestamp
-func (c *cryptoDriver) HashFilename(filename string, algo HashAlgo) (string, error) {
+func (this cryptoDriver) HashFilename(filename string, algo HashAlgo) (string, error) {
 	ext := filepath.Ext(filename)
-	res, err := c.Hash(fmt.Sprintf("%s-at-%d", filename, time.Now().Nanosecond()), algo)
+	res, err := this.Hash(fmt.Sprintf("%s-at-%d", filename, time.Now().Nanosecond()), algo)
 	if err != nil {
-		return "", err
+		return "", this.err(err.Error())
 	}
 	return res + ext, nil
 }
 
 // HashSize get hash size for algorithm
 // return -1 if invalid algo passed
-func (c *cryptoDriver) HashSize(algo HashAlgo) int {
+func (cryptoDriver) HashSize(algo HashAlgo) int {
 	switch algo {
 	case MD4:
 		return md4.Size
@@ -127,40 +131,40 @@ func (c *cryptoDriver) HashSize(algo HashAlgo) int {
 }
 
 // Check check data against hash
-func (c *cryptoDriver) Check(data string, hash string, algo HashAlgo) (bool, error) {
-	res, err := c.Hash(data, algo)
+func (this cryptoDriver) Check(data string, hash string, algo HashAlgo) (bool, error) {
+	res, err := this.Hash(data, algo)
 	if err != nil {
-		return false, err
+		return false, this.err(err.Error())
 	}
 	return res == hash, nil
 }
 
 // Encrypt data
-func (c *cryptoDriver) Encrypt(data []byte) ([]byte, error) {
+func (this cryptoDriver) Encrypt(data []byte) ([]byte, error) {
 	var err error
 
 	// generate key md5
-	key, err := c.Hash(c.key, MD5)
+	key, err := this.Hash(this.key, MD5)
 	if err != nil {
-		return nil, err
+		return nil, this.err(err.Error())
 	}
 
 	// generate cipher
 	block, err := aes.NewCipher([]byte(key))
 	if err != nil {
-		return nil, err
+		return nil, this.err(err.Error())
 	}
 
 	// generate gcm
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
-		return nil, err
+		return nil, this.err(err.Error())
 	}
 
 	// generate nonce
 	nonce := make([]byte, gcm.NonceSize())
 	if _, err = io.ReadFull(rand.Reader, nonce); err != nil {
-		return nil, err
+		return nil, this.err(err.Error())
 	}
 
 	// encrypt data
@@ -169,25 +173,25 @@ func (c *cryptoDriver) Encrypt(data []byte) ([]byte, error) {
 }
 
 // Decrypt data
-func (c *cryptoDriver) Decrypt(data []byte) ([]byte, error) {
+func (this cryptoDriver) Decrypt(data []byte) ([]byte, error) {
 	var err error
 
 	// generate key md5
-	key, err := c.Hash(c.key, MD5)
+	key, err := this.Hash(this.key, MD5)
 	if err != nil {
-		return nil, err
+		return nil, this.err(err.Error())
 	}
 
 	// generate cipher
 	block, err := aes.NewCipher([]byte(key))
 	if err != nil {
-		return nil, err
+		return nil, this.err(err.Error())
 	}
 
 	// generate gcm
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
-		return nil, err
+		return nil, this.err(err.Error())
 	}
 
 	// generate nonce
@@ -196,15 +200,15 @@ func (c *cryptoDriver) Decrypt(data []byte) ([]byte, error) {
 
 	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
-		return nil, err
+		return nil, this.err(err.Error())
 	}
 
 	return plaintext, nil
 }
 
 // EncryptHEX encrypt data and return encrypted value as hex encoded string
-func (c *cryptoDriver) EncryptHEX(data []byte) (string, error) {
-	res, err := c.Encrypt(data)
+func (this cryptoDriver) EncryptHEX(data []byte) (string, error) {
+	res, err := this.Encrypt(data)
 	if err != nil {
 		return "", err
 	}
@@ -213,17 +217,17 @@ func (c *cryptoDriver) EncryptHEX(data []byte) (string, error) {
 }
 
 // DecryptHex decrypt data from hex encoded string.
-func (c *cryptoDriver) DecryptHex(hexString string) ([]byte, error) {
+func (this cryptoDriver) DecryptHex(hexString string) ([]byte, error) {
 	data, err := hex.DecodeString(hexString)
 	if err != nil {
-		return nil, err
+		return nil, this.err(err.Error())
 	}
-	return c.Decrypt(data)
+	return this.Decrypt(data)
 }
 
 // EncryptBase64 encrypt data and return encrypted value as base64 encoded string
-func (c *cryptoDriver) EncryptBase64(data []byte) (string, error) {
-	res, err := c.Encrypt(data)
+func (this cryptoDriver) EncryptBase64(data []byte) (string, error) {
+	res, err := this.Encrypt(data)
 	if err != nil {
 		return "", err
 	}
@@ -232,10 +236,10 @@ func (c *cryptoDriver) EncryptBase64(data []byte) (string, error) {
 }
 
 // DecryptBase64 decrypt data from base64 encoded string.
-func (c *cryptoDriver) DecryptBase64(base64String string) ([]byte, error) {
+func (this cryptoDriver) DecryptBase64(base64String string) ([]byte, error) {
 	data, err := base64.URLEncoding.DecodeString(base64String)
 	if err != nil {
-		return nil, err
+		return nil, this.err(err.Error())
 	}
-	return c.Decrypt(data)
+	return this.Decrypt(data)
 }
