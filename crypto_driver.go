@@ -93,41 +93,13 @@ func (this cryptoDriver) HashFilename(filename string, algo HashAlgo) (string, e
 
 // HashSize get hash size for algorithm
 // return -1 if invalid algo passed
-func (cryptoDriver) HashSize(algo HashAlgo) int {
-	switch algo {
-	case MD4:
-		return md4.Size
-	case MD5:
-		return md5.Size
-	case SHA1:
-		return sha1.Size
-	case SHA256:
-		return sha256.Size
-	case SHA256224:
-		return sha256.Size224
-	case SHA512:
-		return sha512.Size
-	case SHA512224:
-		return sha512.Size224
-	case SHA512256:
-		return sha512.Size256
-	case SHA384:
-		return sha512.Size384
-	case SHA3224:
-		return sha3.New224().Size()
-	case SHA3256:
-		return sha3.New256().Size()
-	case SHA3384:
-		return sha3.New384().Size()
-	case SHA3512:
-		return sha3.New512().Size()
-	case KECCAK256:
-		return sha3.NewLegacyKeccak256().Size()
-	case KECCAK512:
-		return sha3.NewLegacyKeccak512().Size()
+func (this cryptoDriver) HashSize(algo HashAlgo) int {
+	h, err := this.Hash("Test", algo)
+	if err != nil {
+		return -1
 	}
 
-	return -1
+	return len(h)
 }
 
 // Check check data against hash

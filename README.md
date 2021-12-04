@@ -56,7 +56,7 @@ h, err := crp.HashFilename("myfile.jpg", crypto.MD5) // => a1469c8565fc80b552203
 
 ### HashSize
 
-Get hash size for algorithm. return -1 if invalid algo passed.
+Get hash size for algorithm. return -1 if invalid algo passed or on error.
 
 ```go
 // Signature:
