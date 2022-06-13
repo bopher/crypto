@@ -27,14 +27,14 @@ type cryptoDriver struct {
 	key string
 }
 
-func (cryptoDriver) err(format string, args ...interface{}) error {
+func (cryptoDriver) err(format string, args ...any) error {
 	return utils.TaggedError([]string{"Crypto"}, format, args...)
 }
 
 // Hash make hash for data
-func (this cryptoDriver) Hash(data string, algo HashAlgo) (string, error) {
+func (cd cryptoDriver) Hash(data string, algo HashAlgo) (string, error) {
 	var hasher hash.Hash
-	key := []byte(this.key)
+	key := []byte(cd.key)
 
 	switch algo {
 	case MD4:
@@ -70,31 +70,31 @@ func (this cryptoDriver) Hash(data string, algo HashAlgo) (string, error) {
 	}
 
 	if hasher == nil {
-		return "", this.err("invalid hasher %s.", algo)
+		return "", cd.err("invalid hasher %s.", algo)
 	}
 
 	_, err := hasher.Write([]byte(data))
 	if err != nil {
-		return "", this.err(err.Error())
+		return "", cd.err(err.Error())
 	}
 
 	return hex.EncodeToString(hasher.Sum(nil)), nil
 }
 
 // HashFilename make hashed filename based on current timestamp
-func (this cryptoDriver) HashFilename(filename string, algo HashAlgo) (string, error) {
+func (cd cryptoDriver) HashFilename(filename string, algo HashAlgo) (string, error) {
 	ext := filepath.Ext(filename)
-	res, err := this.Hash(fmt.Sprintf("%s-at-%d", filename, time.Now().Nanosecond()), algo)
+	res, err := cd.Hash(fmt.Sprintf("%s-at-%d", filename, time.Now().Nanosecond()), algo)
 	if err != nil {
-		return "", this.err(err.Error())
+		return "", cd.err(err.Error())
 	}
 	return res + ext, nil
 }
 
 // HashSize get hash size for algorithm
 // return -1 if invalid algo passed
-func (this cryptoDriver) HashSize(algo HashAlgo) int {
-	h, err := this.Hash("Test", algo)
+func (cd cryptoDriver) HashSize(algo HashAlgo) int {
+	h, err := cd.Hash("Test", algo)
 	if err != nil {
 		return -1
 	}
@@ -103,40 +103,40 @@ func (this cryptoDriver) HashSize(algo HashAlgo) int {
 }
 
 // Check check data against hash
-func (this cryptoDriver) Check(data string, hash string, algo HashAlgo) (bool, error) {
-	res, err := this.Hash(data, algo)
+func (cd cryptoDriver) Check(data string, hash string, algo HashAlgo) (bool, error) {
+	res, err := cd.Hash(data, algo)
 	if err != nil {
-		return false, this.err(err.Error())
+		return false, cd.err(err.Error())
 	}
 	return res == hash, nil
 }
 
 // Encrypt data
-func (this cryptoDriver) Encrypt(data []byte) ([]byte, error) {
+func (cd cryptoDriver) Encrypt(data []byte) ([]byte, error) {
 	var err error
 
 	// generate key md5
-	key, err := this.Hash(this.key, MD5)
+	key, err := cd.Hash(cd.key, MD5)
 	if err != nil {
-		return nil, this.err(err.Error())
+		return nil, cd.err(err.Error())
 	}
 
 	// generate cipher
 	block, err := aes.NewCipher([]byte(key))
 	if err != nil {
-		return nil, this.err(err.Error())
+		return nil, cd.err(err.Error())
 	}
 
 	// generate gcm
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
-		return nil, this.err(err.Error())
+		return nil, cd.err(err.Error())
 	}
 
 	// generate nonce
 	nonce := make([]byte, gcm.NonceSize())
 	if _, err = io.ReadFull(rand.Reader, nonce); err != nil {
-		return nil, this.err(err.Error())
+		return nil, cd.err(err.Error())
 	}
 
 	// encrypt data
@@ -145,25 +145,25 @@ func (this cryptoDriver) Encrypt(data []byte) ([]byte, error) {
 }
 
 // Decrypt data
-func (this cryptoDriver) Decrypt(data []byte) ([]byte, error) {
+func (cd cryptoDriver) Decrypt(data []byte) ([]byte, error) {
 	var err error
 
 	// generate key md5
-	key, err := this.Hash(this.key, MD5)
+	key, err := cd.Hash(cd.key, MD5)
 	if err != nil {
-		return nil, this.err(err.Error())
+		return nil, cd.err(err.Error())
 	}
 
 	// generate cipher
 	block, err := aes.NewCipher([]byte(key))
 	if err != nil {
-		return nil, this.err(err.Error())
+		return nil, cd.err(err.Error())
 	}
 
 	// generate gcm
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
-		return nil, this.err(err.Error())
+		return nil, cd.err(err.Error())
 	}
 
 	// generate nonce
@@ -172,15 +172,15 @@ func (this cryptoDriver) Decrypt(data []byte) ([]byte, error) {
 
 	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
-		return nil, this.err(err.Error())
+		return nil, cd.err(err.Error())
 	}
 
 	return plaintext, nil
 }
 
 // EncryptHEX encrypt data and return encrypted value as hex encoded string
-func (this cryptoDriver) EncryptHEX(data []byte) (string, error) {
-	res, err := this.Encrypt(data)
+func (cd cryptoDriver) EncryptHEX(data []byte) (string, error) {
+	res, err := cd.Encrypt(data)
 	if err != nil {
 		return "", err
 	}
@@ -189,17 +189,17 @@ func (this cryptoDriver) EncryptHEX(data []byte) (string, error) {
 }
 
 // DecryptHex decrypt data from hex encoded string.
-func (this cryptoDriver) DecryptHex(hexString string) ([]byte, error) {
+func (cd cryptoDriver) DecryptHex(hexString string) ([]byte, error) {
 	data, err := hex.DecodeString(hexString)
 	if err != nil {
-		return nil, this.err(err.Error())
+		return nil, cd.err(err.Error())
 	}
-	return this.Decrypt(data)
+	return cd.Decrypt(data)
 }
 
 // EncryptBase64 encrypt data and return encrypted value as base64 encoded string
-func (this cryptoDriver) EncryptBase64(data []byte) (string, error) {
-	res, err := this.Encrypt(data)
+func (cd cryptoDriver) EncryptBase64(data []byte) (string, error) {
+	res, err := cd.Encrypt(data)
 	if err != nil {
 		return "", err
 	}
@@ -208,10 +208,10 @@ func (this cryptoDriver) EncryptBase64(data []byte) (string, error) {
 }
 
 // DecryptBase64 decrypt data from base64 encoded string.
-func (this cryptoDriver) DecryptBase64(base64String string) ([]byte, error) {
+func (cd cryptoDriver) DecryptBase64(base64String string) ([]byte, error) {
 	data, err := base64.URLEncoding.DecodeString(base64String)
 	if err != nil {
-		return nil, this.err(err.Error())
+		return nil, cd.err(err.Error())
 	}
-	return this.Decrypt(data)
+	return cd.Decrypt(data)
 }
